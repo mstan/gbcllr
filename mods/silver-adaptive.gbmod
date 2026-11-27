@@ -1,0 +1,7 @@
+gbcllr-native-package 1
+id "gbcllr.pokemon-silver.adaptive"
+version "0.2.0"
+target "72b190859a59623cbef6c49d601f8de52c1d2331b4f08a8d2acc17274fc19a8c"
+plugin "gbcllr.gen2.adaptive-view" 1
+view_width -1
+default_enabled 1

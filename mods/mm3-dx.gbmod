@@ -1,0 +1,12 @@
+gbcllr-native-package 1
+id "mm3.dx"
+version "0.1.0"
+target "7344a36fcfc8151098238529218762e44c5a1546fab7e7fd5d32927e06cbf5a8"
+plugin "gbcllr.mm3.dx" 1
+view_width 160
+colorization 1
+asset_input "5507cb47e01bc6cb2554a015f74e6e96cbfec3d2fa1983d4d647a013711ab925"
+author "Kensu William (kensuyjin33): graphics; Marc Max (marc_max): reverse engineering and original DX coding"
+source "https://www.marcrobledo.com/game-boy/mega-man-world-3-dx/"
+description "Native port of Mega Man World 3 DX v1.2b: full-color artwork and scenes, NES pause menu, animation corrections and authored gameplay adjustments."
+default_enabled 0

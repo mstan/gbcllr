@@ -1,0 +1,12 @@
+gbcllr-native-package 1
+id "mm4.adaptive-view"
+version "0.1.0"
+target "4d980ca46a83cd127312dbc445ed1a83e97ed7a8026dce6fdd22a01b1895781b"
+plugin "gbcllr.mm4.adaptive-view" 1
+view_width -1
+default_enabled 1
+weapon_cycle 1
+smooth_gameplay 1
+no_flicker 1
+author "gbcllr contributors"
+description "Adaptive Fit, complete native sprite lists, physical-clock CPU headroom and L/R weapon cycling."

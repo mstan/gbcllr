@@ -1,0 +1,7 @@
+gbcllr-native-package 1
+id "gbcllr.oracle-seasons.adaptive"
+version "0.1.0"
+target "862a51368fb30539279d336b3fe193b43876d2cb15c87a36f5da517804ab3971"
+plugin "gbcllr.oracle.adaptive-view" 1
+view_width -1
+default_enabled 1

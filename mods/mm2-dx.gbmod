@@ -1,0 +1,12 @@
+gbcllr-native-package 1
+id "mm2.dx"
+version "0.1.0"
+target "be3fc7ab2d7eb79a9e2538b090bdecc2694740f3beda933f34cb1e4059b10a11"
+plugin "gbcllr.mm2.dx" 1
+view_width 160
+colorization 1
+asset_input "fe459bd819955e1b98e6cfa992fd44dc1891202a2e1f7285abd79104aa8100ce"
+author "SpecialAgentApe; forple (remixed OST/SFX); Kensuyjin33 (Wily graphics); special thanks marc_max and the GB colorization group"
+source "https://www.romhacking.net/hacks/8688/"
+description "Native port of GBC Edition v1.01, including authored art, menus, interludes, credits and presentation effects. Select on the title chooses remixed/original music."
+default_enabled 0

@@ -1,0 +1,7 @@
+gbcllr-native-package 1
+id "gbcllr.pokemon-yellow.adaptive"
+version "0.1.0"
+target "8cbaa499397e4f1a679c992ea9382a2dd7942ab398b48c19829c2d9529de47bf"
+plugin "gbcllr.gen1.adaptive-view" 1
+view_width -1
+default_enabled 1

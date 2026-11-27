@@ -1,0 +1,12 @@
+gbcllr-native-package 1
+id "mm4.dx"
+version "0.1.0"
+target "4d980ca46a83cd127312dbc445ed1a83e97ed7a8026dce6fdd22a01b1895781b"
+plugin "gbcllr.mm4.dx" 1
+view_width 160
+colorization 1
+asset_input "5507cb47e01bc6cb2554a015f74e6e96cbfec3d2fa1983d4d647a013711ab925"
+author "Kensu William (kensuyjin33): graphics; Marc Max (marc_max): reverse engineering and original DX coding"
+source "https://www.marcrobledo.com/game-boy/mega-man-world-4-dx/"
+description "Native port of Mega Man World 4 DX v1.1: full-color artwork and scenes, NES pause menu, charged-shot recoil option and corrected palette and sprite presentation."
+default_enabled 0

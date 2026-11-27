@@ -1,0 +1,29 @@
+{
+  "version": "Boost.Context 1.90.0",
+  "files": {
+    "jump_x86_64_sysv_elf_gas.S": {
+      "url": "https://raw.githubusercontent.com/boostorg/context/boost-1.90.0/src/asm/jump_x86_64_sysv_elf_gas.S",
+      "sha256": "560c7fa5b5c4476999e50e54a6b14efaddb7c7f42a8de8165cd1336c71c93ef0"
+    },
+    "make_x86_64_sysv_elf_gas.S": {
+      "url": "https://raw.githubusercontent.com/boostorg/context/boost-1.90.0/src/asm/make_x86_64_sysv_elf_gas.S",
+      "sha256": "31c625da72310d90583e1ef51e2ad57d622ab20fdd9e6d7f2fe60dd5fb6fd7ea"
+    },
+    "LICENSE_1_0.txt": {
+      "url": "https://raw.githubusercontent.com/boostorg/boost/boost-1.90.0/LICENSE_1_0.txt",
+      "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566"
+    },
+    "make_x86_64_ms_pe_gas.S": {
+      "url": "https://raw.githubusercontent.com/boostorg/context/boost-1.90.0/src/asm/make_x86_64_ms_pe_gas.asm",
+      "sha256": "2548b3e10092fe596bcecd0675b7e3c3dcc9182aa0983b31e731d3365f84980e",
+      "upstream_sha256": "bc1772836f353c7ea53b258aa503f2310e43e7718d53c07dcb8127b58e4f6dcc",
+      "local_changes": "Removed PE DLL-export directive; implementation instructions remain upstream. CMake scopes the internal symbols."
+    },
+    "jump_x86_64_ms_pe_gas.S": {
+      "url": "https://raw.githubusercontent.com/boostorg/context/boost-1.90.0/src/asm/jump_x86_64_ms_pe_gas.asm",
+      "sha256": "78ac411d9643adb8fc5ae1ff0c5637a24eb674b7084844aebcb60f24598f12a5",
+      "upstream_sha256": "d81766df2b0845528ad13113febfe7eab93dccfa4c2ccfcf0d565b90a1b690ea",
+      "local_changes": "Removed PE DLL-export directive; implementation instructions remain upstream. CMake scopes the internal symbols."
+    }
+  }
+}

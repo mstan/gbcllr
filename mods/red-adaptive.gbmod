@@ -1,0 +1,7 @@
+gbcllr-native-package 1
+id "gbcllr.pokemon-red.adaptive"
+version "0.1.0"
+target "5ca7ba01642a3b27b0cc0b5349b52792795b62d3ed977e98a09390659af96b7b"
+plugin "gbcllr.gen1.adaptive-view" 1
+view_width -1
+default_enabled 1

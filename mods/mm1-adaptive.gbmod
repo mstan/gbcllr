@@ -1,0 +1,11 @@
+gbcllr-native-package 1
+id "mm1.adaptive-view"
+version "0.1.0"
+target "33d16365318411f063edd9100c79458aabb7ea71bb1873e30f38b93814f0ec6e"
+plugin "gbcllr.mm1.adaptive-view" 1
+view_width -1
+no_flicker 1
+smooth_gameplay 1
+weapon_cycle 1
+description "Adaptive view, complete native sprites, smooth gameplay and L/R weapon selection. Experimental; full campaign qualification remains open."
+default_enabled 1

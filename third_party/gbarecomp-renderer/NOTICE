@@ -1,0 +1,10 @@
+The persistent indexed-surface update and fixed-scene span-consumer strategies
+in src/indexed_tile_surface.cpp and src/sml2_native_mods.cpp are adapted from
+GbaHighResolutionFrame::Surface::update and the regular-BG tile-span compositor:
+Local donor: F:/Projects/gbarecomp/gbarecomp
+Observed donor commit: 92b26b28bcae84ad55a6bee8abd3ad3750a8906f
+Files: src/gba/gba_high_resolution.cpp and src/gba/gba_ppu.cpp.
+Copyright (c) 2026 Matthew Stanley.
+The donor PolyForm Noncommercial License 1.0.0 is retained in LICENSE.
+The GB2bpp address decoder, caller guards and integration are gbcllr-specific.
+No GBA register or emulated device implementation is copied into the GB core.

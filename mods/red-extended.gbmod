@@ -1,0 +1,9 @@
+gbcllr-native-package 1
+id "gbcllr.pokemon-red.extended"
+version "0.1.0"
+target "5ca7ba01642a3b27b0cc0b5349b52792795b62d3ed977e98a09390659af96b7b"
+plugin "gbcllr.gen1.extended" 1
+asset_input "14d556f64fc29c403fba3e823cda103c96ab269cec67a5871af9ecf181156680"
+view_width -1
+expanded_encounters 0
+default_enabled 1

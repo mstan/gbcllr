@@ -1,0 +1,9 @@
+gbcllr-native-package 1
+id "sml2.adaptive-view"
+version "1.0.0"
+target "42045a1642f77b568534ab85b9db93c8a33d2b95c38ae84c987f497e8d52f97f"
+plugin "gbcllr.sml2.adaptive-view" 1
+view_width -1
+colorization 1
+asset_input "1dd604a91b9ee99ef381cc795da3ae28c72d04ba9de78b355df829e56ce49c46"
+default_enabled 1

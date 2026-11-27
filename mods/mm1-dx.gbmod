@@ -1,0 +1,12 @@
+gbcllr-native-package 1
+id "mm1.dx"
+version "0.1.0"
+target "33d16365318411f063edd9100c79458aabb7ea71bb1873e30f38b93814f0ec6e"
+plugin "gbcllr.mm1.dx" 1
+view_width 160
+colorization 1
+asset_input "fe459bd819955e1b98e6cfa992fd44dc1891202a2e1f7285abd79104aa8100ce"
+author "SpecialAgentApe; Superjustinbros (weapon icons); SuxMenner (title logo, modified); Kensuyjin33 (Enker graphics/palettes); Tails Gaming Power (cutting wheel/misc); special thanks marc_max"
+source "https://www.romhacking.net/hacks/7492/"
+description "Native port of GBC Conversion v1.02, including authored gameplay art, menus, cutscenes, credits, palettes and presentation effects."
+default_enabled 0

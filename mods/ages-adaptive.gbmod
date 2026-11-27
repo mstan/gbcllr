@@ -1,0 +1,7 @@
+gbcllr-native-package 1
+id "gbcllr.oracle-ages.adaptive"
+version "0.1.0"
+target "0b56b78a9e45452e98c33edd111234931f1e034dc097f6f23082eb8db6055474"
+plugin "gbcllr.oracle.adaptive-view" 1
+view_width -1
+default_enabled 1

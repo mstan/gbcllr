@@ -1,0 +1,7 @@
+gbcllr-native-package 1
+id "gbcllr.pokemon-gold.adaptive"
+version "0.2.0"
+target "fb0016d27b1e5374e1ec9fcad60e6628d8646103b5313ca683417f52b97e7e4e"
+plugin "gbcllr.gen2.adaptive-view" 1
+view_width -1
+default_enabled 1

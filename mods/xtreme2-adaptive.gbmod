@@ -1,0 +1,9 @@
+gbcllr-native-package 1
+id "xtreme2.adaptive-view"
+version "1.0.0"
+target "e37a14a8e61bd64f2226dacc26a7ee75dd90abfcf88c5016eb97b76ecda0ddca"
+plugin "gbcllr.xtreme2.adaptive-view" 1
+view_width -1
+default_enabled 1
+weapon_cycle 0
+smooth_gameplay 0

@@ -1,0 +1,75 @@
+{
+  "sameboy": {
+    "url": "https://github.com/LIJI32/SameBoy.git",
+    "revision": "eb4c47ebf58cf93261620bfe138b650979f94049",
+    "import": [
+      "Core",
+      "LICENSE"
+    ],
+    "license": "Expat",
+    "adaptations": [
+      "Instance-owned serialized RNG",
+      "Optional guarded generated instruction/resumable block dispatch",
+      "Instruction-end and native execution counters outside guest state",
+      "Unsaved serial callback timer-phase metadata",
+      "Opt-in cooperative timer/T-cycle suspension for experimental cable pairs"
+    ]
+  },
+  "rbengine": {
+    "url": "https://github.com/RetroPortingToolKit/rbengine.git",
+    "revision": "2a03e73693acee0fb78076ea058642c931bef12e",
+    "import": [
+      "include",
+      "src",
+      "CMakeLists.txt",
+      "LICENSE"
+    ],
+    "adaptations": []
+  },
+  "recomp-net": {
+    "url": "https://github.com/RetroPortingToolKit/recomp-net.git",
+    "revision": "41724abd94ab794a6749ba8658f110b565d966f9",
+    "import": [
+      "Git submodule"
+    ],
+    "license": "MIT",
+    "adaptations": [
+      "Publish agreed confirmation while simulation is held",
+      "Confirm reached holds before sending coordinated-drain markers",
+      "Bounded wall-clock retry of owed repairs at reached holds"
+    ]
+  },
+  "recomp-ui": {
+    "url": "https://github.com/RetroPortingToolKit/recomp-ui.git",
+    "revision": "fa7d2cb7d7d51af08eafc40255cf4d4657225e83",
+    "import": [
+      "Git submodule"
+    ],
+    "license": "MIT",
+    "adaptations": [
+      "Preserve UTF-8 byte interfaces for C++20 char8_t consumers",
+      "Wrap and bound mod controls inside narrow details panes"
+    ]
+  },
+  "architectural_references": {
+    "gbrecompiled": "5db70a9",
+    "psxrecomp": "93a93c8e0",
+    "snesrecomp": "8dc869cf",
+    "gbarecomp": "92b26b2"
+  },
+  "xtreme2-adaptive": {
+    "url": "https://github.com/mstan/MegamanXtreme2Recompiled",
+    "revision": "e4649e231cc239a0f220f8afe0ae996916e0c6cf",
+    "import": [
+      "mmx2_adaptive.c -> src/native_mods.cpp",
+      "mmx2_map.h -> src/mmx2_map.hpp"
+    ],
+    "license": "No root license at donor revision; redistribution unqualified",
+    "adaptations": [
+      "Per-instance pointer-free mutable state",
+      "SameBoy timed bus instruction/operand guards",
+      "Hardware-encoded palettes",
+      "Dynamic Fit viewport and pure presentation rendering"
+    ]
+  }
+}

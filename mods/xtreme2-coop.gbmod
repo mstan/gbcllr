@@ -1,0 +1,10 @@
+gbcllr-native-package 1
+id "gbcllr.xtreme2.coop"
+version "0.0.1"
+target "e37a14a8e61bd64f2226dacc26a7ee75dd90abfcf88c5016eb97b76ecda0ddca"
+plugin "gbcllr.xtreme2.coop" 1
+view_width -1
+player1_character 0
+default_enabled 0
+weapon_cycle 0
+smooth_gameplay 0

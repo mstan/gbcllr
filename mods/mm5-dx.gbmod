@@ -1,0 +1,12 @@
+gbcllr-native-package 1
+id "mm5.dx"
+version "0.1.0"
+target "7a108770a7c1ad592b52d0c46d7ead422d0a20961abaafca3d40086e3f2f588f"
+plugin "gbcllr.mm5.dx" 1
+view_width 160
+colorization 1
+asset_input "33810b147dd6bbec269ca0ab1ed8892acc974825b7f3f19c5b7fbed7a4b3423a"
+author "Kensu William (kensuyjin33): graphics; Marc Max (marc_max): reverse engineering and coding; kindlypatrick: retained initial stage palettes"
+source "https://www.marcrobledo.com/game-boy/mega-man-world-5-dx/"
+description "Mega Man World 5 DX v1.6.2 colors, art, animations and NES-style pause, with its authored timing."
+default_enabled 0

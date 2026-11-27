@@ -1,0 +1,9 @@
+gbcllr-native-package 1
+id "gbcllr.pokemon-blue.extended"
+version "0.1.0"
+target "2a951313c2640e8c2cb21f25d1db019ae6245d9c7121f754fa61afd7bee6452d"
+plugin "gbcllr.gen1.extended" 1
+asset_input "14d556f64fc29c403fba3e823cda103c96ab269cec67a5871af9ecf181156680"
+view_width -1
+expanded_encounters 0
+default_enabled 1

@@ -1,0 +1,7 @@
+[submodule "recomp-net"]
+	path = third_party/recomp-net
+	url = https://github.com/RetroPortingToolKit/recomp-net.git
+[submodule "third_party/recomp-ui"]
+	path = third_party/recomp-ui
+	url = https://github.com/RetroPortingToolKit/recomp-ui.git
+	branch = master
