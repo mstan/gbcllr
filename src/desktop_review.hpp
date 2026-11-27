@@ -8,11 +8,15 @@
 #include <iomanip>
 #include <sstream>
 #include <stdexcept>
+#include <diagnostics_server.h>
+#include <utility>
 
 class DesktopReview {
     std::filesystem::path root;
     uint64_t serial=0;
     uint32_t next_poll=0;
+    std::unique_ptr<DiagServer,decltype(&diag_server_destroy)> server{nullptr,diag_server_destroy};
+    std::string pending;
     static std::string quoted(std::string_view value) {
         std::string out="\"";
         for(unsigned char ch:value) {
@@ -30,8 +34,8 @@ class DesktopReview {
         text<<",\"renderer\":"<<quoted(renderer_name?renderer_name:"")
             <<",\"lcd_gpu_draws\":"<<lcd_gpu_draws<<",\"lcd_upload_bytes\":"<<lcd_upload_bytes;
         if(!error.empty())text<<",\"error\":"<<quoted(error);
-        text<<"}\n";auto bytes=text.str();
-        gbcllr::write_file_atomic(root/("reply-"+std::to_string(serial)+".json"),{reinterpret_cast<const uint8_t*>(bytes.data()),bytes.size()});
+        text<<"}";auto bytes=text.str();
+        diag_server_reply(server.get(),bytes.c_str());
     }
 public:
     const char* renderer_name=nullptr;
@@ -41,17 +45,25 @@ public:
     bool active()const{return !root.empty();}
     explicit DesktopReview(bool single) {
         const char* value=std::getenv("GBCLLR_REVIEW_DIR");
-        if(single&&value&&*value){root=value;std::filesystem::create_directories(root);hold=true;}
+        if(single&&value&&*value){
+            root=value;std::filesystem::create_directories(root);hold=true;
+            server.reset(diag_server_create(0));if(!server)throw std::runtime_error("cannot create native review server");
+            diag_server_register(server.get(),"review",[](void* p,DiagServer* s,const char* args){
+                auto& self=*static_cast<DesktopReview*>(p);
+                if(!self.pending.empty())diag_server_reply(s,"{\"ok\":false,\"error\":\"review request pending\"}");
+                else self.pending=args;
+            },this);
+            auto endpoint=std::string("{\"host\":\"127.0.0.1\",\"port\":")+std::to_string(diag_server_port(server.get()))+"}\n";
+            gbcllr::write_file_atomic(root/"endpoint.json",{reinterpret_cast<const uint8_t*>(endpoint.data()),endpoint.size()});
+        }
     }
     template<class Capture,class Reset,class Resize> bool poll(gbcllr::Machine& machine,uint32_t& tick,
         bool& running,bool menu,Capture capture,Reset reset,Resize resize) {
         wants_play=false;
         if(root.empty()||!SDL_TICKS_PASSED(SDL_GetTicks(),next_poll))return false;
         next_poll=SDL_GetTicks()+50;
-        // Request IDs, rather than filesystem timestamp resolution, determine
-        // freshness. Consecutive GUI actions can share one timestamp.
-        std::string line;
-        {std::ifstream file(root/("request-"+std::to_string(serial+1)+".txt"));std::getline(file,line);}
+        diag_server_poll(server.get());
+        std::string line=std::exchange(pending,{});
         if(line.size()>8192)return false;
         std::istringstream input(line);uint64_t id=0;std::string op,path;
         if(!(input>>id>>op)||id!=serial+1)return false;

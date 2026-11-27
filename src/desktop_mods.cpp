@@ -38,10 +38,15 @@ const char* dx_author(DesktopConfig& c){return c.dx_package->author.empty()?"See
 bool custom(DesktopConfig& c){for(auto n:widths)if(n==c.view_width)return false;return true;}
 int game_packages(DesktopConfig& c){return int(bool(c.package))+int(bool(c.dx_package));}
 int game_features(void* p){auto& c=config(p);return (c.package?(megaman(c)?4:xtreme2(c)?4:extended(c)?3:gen2(c)?2:1):0)+int(bool(c.dx_package));}
-int count(void* p){return game_packages(config(p))+1+config(p).sgb_supported;}
-int feature_count(void* p){return game_features(p)+1+config(p).sgb_supported;}
+int count(void* p){return game_packages(config(p))+2+config(p).sgb_supported;}
+int feature_count(void* p){return game_features(p)+2+config(p).sgb_supported;}
 int package_get(void* p,int i,RecompLauncherCModPackage* out) {
  auto& c=config(p);if(!out||i<0||i>=count(p))return 0;*out={};
+ if(i==count(p)-1){
+  copy(out->id,"gbcllr.diagnostics");copy(out->version,"1");copy(out->name,"Diagnostics and replay recording");copy(out->author,"gbcllr contributors");
+  copy(out->description,"Bounded local input recordings and bug reports. Recording is enabled by default and remembered for this game.");
+  copy(out->status,"Applies on next start");out->enabled=c.diagnostics;return 1;
+ }
  if(i==game_packages(c)+1){
   copy(out->id,desktop_sgb_package);copy(out->version,"1");copy(out->name,"Cartridge Super Game Boy");copy(out->author,"gbcllr contributors");
   copy(out->description,"Enable a DMG/SGB session on the next start. Save in game before quitting. The cartridge supplies its own regional colors and border; display switches then apply live.");
@@ -65,6 +70,12 @@ int package_get(void* p,int i,RecompLauncherCModPackage* out) {
 }
 int feature_get(void* p,int i,RecompLauncherCModFeature* out) {
  auto& c=config(p);if(!out||i<0||i>=feature_count(p))return 0;*out={};
+ if(i==feature_count(p)-1){
+  copy(out->id,"recording");copy(out->package_id,"gbcllr.diagnostics");copy(out->package_version,"1");copy(out->package_name,"Diagnostics and replay recording");
+  copy(out->name,"Automatic recording");copy(out->group,"Diagnostics");copy(out->author,"gbcllr contributors");
+  copy(out->description,"Keep bounded local input and checkpoint history for bug reports. No files are uploaded. Applies on next start.");
+  copy(out->status,c.diagnostics?"Enabled on next start":"Disabled on next start");out->enabled=c.diagnostics;return 1;
+ }
  if(i==game_features(p)+1){
   copy(out->id,desktop_sgb_feature);copy(out->package_id,desktop_sgb_package);copy(out->package_version,"1");copy(out->package_name,"Cartridge Super Game Boy");
   copy(out->name,"SGB session (next start)");copy(out->group,"Super Game Boy");copy(out->author,"gbcllr contributors");
@@ -175,6 +186,7 @@ int choice_get(void* p,const char* package,const char* f,const char* option,int 
 }
 int enable(void* p,const char* package,const char* f,int enabled) {
  auto& c=config(p);
+ if(package&&f&&!std::strcmp(package,"gbcllr.diagnostics")&&!std::strcmp(f,"recording")){c.diagnostics=enabled!=0;return 1;}
  if(sgb_identity(c,package,f)){c.sgb_requested=enabled!=0;return 1;}
  if(presentation_identity(package,f)){c.presentation.enabled=enabled!=0;return 1;}
  if(dx_identity(c,package,f)){c.colorization=enabled!=0;c.mod_color_saved=true;return 1;}

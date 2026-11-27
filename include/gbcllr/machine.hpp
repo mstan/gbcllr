@@ -9,6 +9,7 @@
 #include <vector>
 #include <gbcllr/mods.hpp>
 #include <gbcllr/input.hpp>
+#include <recomp_mod.h>
 
 namespace gbcllr {
 class OracleNativeMods;
@@ -67,7 +68,7 @@ struct LinkCallbacks {
 // One owner/thread per instance. No process-global simulation state.
 class Machine {
 public:
-    static constexpr uint32_t snapshot_schema=12;
+    static constexpr uint32_t snapshot_schema=13;
     static constexpr uint32_t partial_snapshot_schema=snapshot_schema+1;
     Machine(std::span<const uint8_t> rom, Options options = {});
     ~Machine();
@@ -153,6 +154,15 @@ public:
     // One CPU instruction (or halted hardware quantum), including an enhanced
     // instruction which consumes CPU headroom without advancing physical time.
     void debug_step_instruction();
+    // Owner-thread, paused activation. Original input identity remains fixed.
+    // RAM uses guest addresses; cartridge uses physical offsets. Registered
+    // overlays use their stable id as a separate bounded writable address space.
+    void import_overlay(std::string id,std::span<const uint8_t> content);
+    std::span<const uint8_t> overlay(std::string_view id) const;
+    using RuntimeHook=void (*)(Machine&,void*) noexcept;
+    void register_runtime_hook(std::string id,uint16_t pc,RuntimeHook,void* user=nullptr);
+    bool apply_mod_plan(rmod_context*,std::string_view game_id,
+        std::span<const rmod_patch>,std::span<const rmod_hook>,std::string& error);
 private:
     friend class RewindHistory;
     friend class CablePair;
