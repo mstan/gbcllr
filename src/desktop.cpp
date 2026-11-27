@@ -129,7 +129,7 @@ static int desktop_loop(gbcllr::Machine* solo,const DesktopNetStart* linked,
         initial_window_width=std::max(initial_window_width,initial_view.height*16/9);
     auto window=std::unique_ptr<SDL_Window,decltype(&SDL_DestroyWindow)>(SDL_CreateWindow(title.c_str(),SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED,
         int(initial_window_width)*c.scale,int(initial_view.height)*c.scale,SDL_WINDOW_RESIZABLE|SDL_WINDOW_ALLOW_HIGHDPI|
-        ((SDL_getenv("LNG_TEST_HIDDEN")&&SDL_getenv("LNG_SCRIPT"))?SDL_WINDOW_HIDDEN:0)),SDL_DestroyWindow);
+        ((SDL_getenv("GBCLLR_WINDOW_HIDDEN")||(SDL_getenv("LNG_TEST_HIDDEN")&&SDL_getenv("LNG_SCRIPT")))?SDL_WINDOW_HIDDEN:0)),SDL_DestroyWindow);
     if(qa){if(activation)SDL_SetHint(SDL_HINT_WINDOW_NO_ACTIVATION_WHEN_SHOWN,previous_activation.c_str());else SDL_ResetHint(SDL_HINT_WINDOW_NO_ACTIVATION_WHEN_SHOWN);}
     if(!window)throw std::runtime_error(SDL_GetError());
     auto renderer=std::unique_ptr<SDL_Renderer,decltype(&SDL_DestroyRenderer)>(DesktopLcd::create_renderer(window.get()),SDL_DestroyRenderer);

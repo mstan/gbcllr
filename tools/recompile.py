@@ -62,7 +62,7 @@ def discover(rom, seeds):
             pos = following
     return seen
 
-def generate(rom, seeds, output, blocks=False, prefix='llr'):
+def generate(rom, seeds, output, blocks=False, prefix='llr', complete=False):
     source = (ROOT/'third_party/sameboy/Core/sm83_cpu.c').read_text()
     table = source.split('static opcode_t *opcodes[256] = {',1)[1].split('};',1)[0]
     table = re.sub(r'/\*.*?\*/', '', table, flags=re.S)
@@ -74,15 +74,37 @@ def generate(rom, seeds, output, blocks=False, prefix='llr'):
     # after the opcode fetch. Each native body sees a constant opcode, letting
     # the compiler fold register/flag selection while retaining timed bus reads.
     out = ['/* ROM-derived generated code; do not redistribute with source. */']
-    used = sorted({rom[pos] for pos in entries})
+    used = list(range(256)) if complete else sorted({rom[pos] for pos in entries})
     for op in used:
         out += [f'static void {prefix}_op_{op:02x}(GB_gameboy_t *gb) {{ {handlers[op]}(gb, 0x{op:02x}); }}']
     out += [f'static void (*const {prefix}_bodies[256])(GB_gameboy_t*) = {{']
     out += [f'[{op}] = {prefix}_op_{op:02x},' for op in used]
-    out += ['};', f'static const uint16_t {prefix}_map[{len(rom)}] = {{']
-    out += [f'[{pos}] = {rom[pos]+1},' for pos in sorted(entries)]
-    out += ['};', f'static unsigned {prefix}_native_dispatch(GB_gameboy_t *gb, uint32_t offset, uint8_t opcode) {{',
-            f'if (offset >= {len(rom)} || {prefix}_map[offset] != (unsigned)opcode + 1) return 0;']
+    if complete:
+        out += ['};', f'static const uint8_t {prefix}_expected[{len(rom)}] = {{']
+        out += [','.join(str(v) for v in rom[i:i+32])+',' for i in range(0,len(rom),32)]
+        out += ['};', f'static unsigned {prefix}_native_dispatch(GB_gameboy_t *gb, uint32_t offset, uint8_t opcode) {{']
+        # Crystal copies this original ROM routine into HRAM at startup.
+        # Bind the copied native entries to their exact original source bytes.
+        # Operands remain live timed reads, and writes to either space are valid.
+        copied_sources={
+            'fdcc3c8c43813cf8731fc037d2a6d191bac75439c34b24ba1c27526e6acdc8a2':(0x403f,0x4049,0xff80),
+            '5ca7ba01642a3b27b0cc0b5349b52792795b62d3ed977e98a09390659af96b7b':(0x4bfb,0x4c05,0xff80),
+        }
+        copied=copied_sources.get(hashlib.sha256(rom).hexdigest())
+        if copied:
+            out += ['if (offset == UINT32_MAX) {', 'switch ((uint16_t)(gb->pc - 1)) {']
+            start,end,destination=copied
+            pos=start
+            while pos<end:
+                out += [f'case 0x{destination+pos-start:04x}: if (opcode != 0x{rom[pos]:02x}) return 0; {prefix}_op_{rom[pos]:02x}(gb); return 1;']
+                pos+=LENGTHS[rom[pos]]
+            out += ['default: return 0;', '}', '}']
+        out += [f'if (offset >= {len(rom)} || {prefix}_expected[offset] != opcode) return 0;']
+    else:
+        out += ['};', f'static const uint16_t {prefix}_map[{len(rom)}] = {{']
+        out += [f'[{pos}] = {rom[pos]+1},' for pos in sorted(entries)]
+        out += ['};', f'static unsigned {prefix}_native_dispatch(GB_gameboy_t *gb, uint32_t offset, uint8_t opcode) {{',
+                f'if (offset >= {len(rom)} || {prefix}_map[offset] != (unsigned)opcode + 1) return 0;']
     polls=[pos for pos in sorted(entries) if pos%0x4000<=0x4000-6 and rom[pos:pos+6]==bytes([0xf0,0x41,0xe6,2,0x20,0xfa])]
     if polls:
         out += ['#if GBCLLR_NATIVE_WAIT && GBCLLR_FRAME_AUDIO',
@@ -90,14 +112,14 @@ def generate(rom, seeds, output, blocks=False, prefix='llr'):
                 'unsigned retired=GB_native_stat_poll_wait(gb); if(retired)return retired;', '}', '#endif']
     out += [f'{prefix}_bodies[opcode](gb); return 1;', '}']
     block_count=0
-    if blocks:
+    if blocks and not complete:
         out,block_count=emit_blocks(rom,entries,LENGTHS,handlers,prefix)
     output.mkdir(parents=True, exist_ok=True)
     (output/'llr_program.inc').write_text('\n'.join(out)+'\n')
     digest = hashlib.sha256(rom).hexdigest()
     write_identities(output,[digest])
-    metadata = {'sha256':digest, 'rom_bytes':len(rom), 'native_entries':len(entries),
-                'tier':'resumable-native-blocks' if blocks else 'instruction-specialization',
+    metadata = {'sha256':digest, 'rom_bytes':len(rom), 'native_entries':len(rom) if complete else len(entries),
+                'tier':'complete-original-entry-specialization' if complete else 'resumable-native-blocks' if blocks else 'instruction-specialization',
                 'banks':len(banks), 'blocks':block_count}
     (output/'program.json').write_text(json.dumps(metadata, indent=2)+'\n')
     return metadata
@@ -117,16 +139,16 @@ def symbol_seeds(path):
                 seeds.add(bank*0x4000+(address&0x3fff))
     return seeds
 
-def generate_catalog(cartridges, output, blocks=False):
+def generate_catalog(cartridges, output, blocks=False, complete=False):
     """Bind each machine once by exact hash; dispatch keeps its own ROM guard."""
     identities=[hashlib.sha256(rom).hexdigest() for rom,seeds in cartridges]
     if len(set(identities))!=len(identities):
         raise ValueError('duplicate cartridge identity in generated catalogue')
     if len(cartridges)==1:
-        return generate(*cartridges[0],output,blocks)
+        return generate(*cartridges[0],output,blocks,complete=complete)
     metadata=[];out=[]
     for i,(rom,seeds) in enumerate(cartridges):
-        metadata.append(generate(rom,seeds,output/f'cart_{i}',blocks,f'llr_cart_{i}'))
+        metadata.append(generate(rom,seeds,output/f'cart_{i}',blocks,f'llr_cart_{i}',complete))
         out.append(f'#include "cart_{i}/llr_program.inc"')
     out+=['static unsigned llr_native_dispatch(GB_gameboy_t *gb, uint32_t offset, uint8_t opcode) {',
           'switch (gb->llr_program_index) {']
@@ -149,6 +171,7 @@ def main():
                    help='RGBDS discovery symbols bound to an exact catalogue ROM hash')
     p.add_argument('--trace', type=pathlib.Path)
     p.add_argument('--blocks', action='store_true')
+    p.add_argument('--complete-rom-entries', action='store_true')
     args = p.parse_args()
     rom = args.rom.read_bytes()
     if len(rom)<0x8000 or len(rom)&(len(rom)-1):
@@ -178,7 +201,7 @@ def main():
         assigned.add(digest)
         by_hash[digest].update(symbol_seeds(pathlib.Path(path)))
     try:
-        print(json.dumps(generate_catalog(cartridges,args.output,args.blocks)))
+        print(json.dumps(generate_catalog(cartridges,args.output,args.blocks,args.complete_rom_entries)))
     except ValueError as error:
         p.error(str(error))
 

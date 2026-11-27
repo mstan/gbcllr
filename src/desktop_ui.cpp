@@ -306,6 +306,9 @@ bool desktop_prepare(DesktopConfig& c,std::filesystem::path& rom,std::filesystem
         c.presentation_filter_selected=false;
         auto mod_provider=desktop_mod_provider(c);gi.mods=&mod_provider;
         gi.name=title.c_str();gi.has_screen_kind=0;gi.has_bios=1;
+#if GBCLLR_HLE_ONLY
+        gi.has_bios=0;
+#endif
         if(c.package&&(c.package->feature.plugin=="gbcllr.xtreme2.coop"||c.package->feature.plugin=="gbcllr.xtreme2.adaptive-view"))gi.native_player_count=gi.num_players=2;
         gi.bios_verify_for_rom=desktop_verify_boot_for_rom;gi.bios_verify_ctx=&boot_context;
         // Extended selection resolves its save after the launcher returns.
@@ -352,6 +355,9 @@ bool desktop_prepare(DesktopConfig& c,std::filesystem::path& rom,std::filesystem
     if(gbcllr::sha256(image)!=identity)throw std::runtime_error("desktop profile cartridge identity differs");
     options.model=desktop_boot_model(boot_context,identity,image.size()>0x143?image[0x143]:0,
         boot.empty()?std::string{}:gbcllr::sha256(gbcllr::read_file(boot)));
+#if GBCLLR_HLE_ONLY
+    boot.clear(); // Native post-boot provider; preserve the saved external BIOS preference.
+#endif
     options.sgb_service=c.sgb_requested;c.sgb_current=options.sgb_service;
     if(options.sgb_service&&!c.sgb_supported)throw std::runtime_error("This cartridge does not advertise SGB features.");
     c.color=options.model==gbcllr::Model::cgb;

@@ -1822,8 +1822,14 @@ void GB_cpu_run(GB_gameboy_t *gb)
             gb->llr_native_count += native_count;
         }
         else {
+#if GBCLLR_HLE_ONLY
+            gb->llr_native_uncovered = true;
+            gb->llr_uncovered_pc = gb->pc - 1;
+            gb->llr_uncovered_opcode = opcode;
+#else
             gb->llr_fallback_count++;
             opcodes[opcode](gb, opcode);
+#endif
         }
     }
     

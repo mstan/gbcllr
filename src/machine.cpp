@@ -1,5 +1,6 @@
 #include <gbcllr/machine.hpp>
 #include <gbcllr/diagnostics.hpp>
+#include <recomp_persistence/atomic_file.h>
 #include <gb.h>
 #include "identity.h"
 #include "native_mods.hpp"
@@ -10,6 +11,7 @@
 #include <cstdlib>
 #include <fstream>
 #include <set>
+#include <map>
 #include <stdexcept>
 #include <type_traits>
 #ifdef _WIN32
@@ -62,6 +64,21 @@ struct Machine::Impl {
     std::string identity;
     std::string abi_identity;
     std::string boot_identity;
+    std::array<uint8_t,32> plan_identity{};
+    struct Hook {uint16_t pc;Machine::RuntimeHook callback;void* user;bool enabled=false;};
+    std::map<std::string,Hook,std::less<>> runtime_hooks;
+    std::map<std::string,std::vector<uint8_t>,std::less<>> overlays;
+    bool applying_plan=false;
+    void inherit_plan(const Impl& owner,bool include_hooks=true) {
+        plan_identity=owner.plan_identity;overlays=owner.overlays;
+        if(include_hooks)runtime_hooks=owner.runtime_hooks;
+        std::copy_n(owner.gb.rom,owner.gb.rom_size,gb.rom);
+    }
+    void extend_plan(std::span<const uint8_t> identity) {
+        std::vector<uint8_t> bytes(plan_identity.begin(),plan_identity.end());
+        bytes.insert(bytes.end(),identity.begin(),identity.end());auto hash=sha256(bytes);
+        for(unsigned i=0;i<32;++i)plan_identity[i]=uint8_t(std::stoul(hash.substr(i*2,2),nullptr,16));
+    }
     NativeMods mods;
     // Derived subscriptions are rebuilt at construction, never serialized.
     std::array<uint8_t,8192> instruction_sites{},read_sites{};
@@ -236,6 +253,10 @@ struct Machine::Impl {
         if(m.link.infrared_output)m.link.infrared_output(m.link.context,event_tick(gb),on);
     }
     Impl(std::span<const uint8_t> image,Options opts):options(std::move(opts)),rom(image.begin(),image.end()),identity(sha256(image)),mods(identity,options.mods,options.model==Model::cgb) {
+#if GBCLLR_HLE_ONLY
+        if(!options.native)throw std::runtime_error("This build requires native HLE execution");
+        if(!options.boot_rom.empty())throw std::runtime_error("This HLE build uses native post-boot initialization; compiled BIOS coverage is unavailable");
+#endif
         boot_identity=sha256(options.boot_rom);
 #if GBCLLR_MOD_EVENT_FILTERS
         auto instructions=mods.instruction_sites(),reads=mods.read_sites();
@@ -299,11 +320,20 @@ struct Machine::Impl {
             (identity=="fdcc3c8c43813cf8731fc037d2a6d191bac75439c34b24ba1c27526e6acdc8a2" ||
              identity=="e37a14a8e61bd64f2226dacc26a7ee75dd90abfcf88c5016eb97b76ecda0ddca");
 #if GBCLLR_DMG_FRAME
-        // Stock DMG picture ownership is separate from enhanced and SGB views.
+        // The existing native line-picture owner also serves the exact Gen1
+        // cartridge. Its native map compositor retains its instruction, write,
+        // line and frame observers; SGB remains a separately qualified profile.
         if(options.model==Model::dmg && !sgb && !options.reference_picture && !mods.active() &&
            identity=="42045a1642f77b568534ab85b9db93c8a33d2b95c38ae84c987f497e8d52f97f")
             gb.llr_frame_picture_enabled=true;
+        if(options.model==Model::dmg && !sgb && !options.reference_picture &&
+           identity=="5ca7ba01642a3b27b0cc0b5349b52792795b62d3ed977e98a09390659af96b7b")
+            gb.llr_frame_picture_enabled=true;
 #endif
+#endif
+#if GBCLLR_HLE_ONLY && GBCLLR_FRAME_PICTURE
+        if(!gb.llr_frame_picture_enabled)
+            throw std::runtime_error("Native picture coverage is unavailable for the selected cartridge/model/profile");
 #endif
         gb.llr_program_index=program_index;
         gb.llr_blocks_enabled=options.native && GBCLLR_NATIVE_BLOCKS;
@@ -342,6 +372,7 @@ struct Machine::Impl {
         if(simulation){const char zero_abi[64]{};bytes(v,zero_abi,sizeof zero_abi);}
         else bytes(v,abi_identity.data(),abi_identity.size());
         bytes(v,boot_identity.data(),boot_identity.size());
+        bytes(v,plan_identity.data(),plan_identity.size());
         append(v,ticks);append(v,frame_deadline);append(v,buttons);
         const uint32_t core_size=offsetof(GB_gameboy_t,llr_reset_seed);
         // dma_cycles is scratch for the current GB_advance_cycles call: that
@@ -407,6 +438,8 @@ struct Machine::Impl {
             throw std::runtime_error("snapshot compiler/platform ABI mismatch");
         r.read(id,64);
         if(std::string(id,64)!=boot_identity) throw std::runtime_error("snapshot boot ROM mismatch");
+        std::array<uint8_t,32> saved_plan{};r.read(saved_plan.data(),saved_plan.size());
+        if(saved_plan!=plan_identity)throw std::runtime_error("snapshot mod plan mismatch");
         ticks=r.value<uint64_t>();frame_deadline=r.value<uint64_t>();buttons=r.value<uint8_t>();
         auto core_size=r.value<uint32_t>();
         if(core_size!=offsetof(GB_gameboy_t,llr_reset_seed)) throw std::runtime_error("snapshot ABI mismatch");
@@ -479,6 +512,7 @@ std::unique_ptr<Machine> Machine::presentation_copy() const {
     options.reference_picture=!impl_->gb.llr_frame_picture_enabled;
 #endif
     auto copy=std::make_unique<Machine>(impl_->rom,std::move(options));
+    copy->impl_->inherit_plan(*impl_,false);
     std::vector<uint8_t> local;impl_->append_state(local,false,false,false);
     copy->impl_->load(local,false,false);
     copy->impl_->presentation_only=true;
@@ -548,6 +582,9 @@ template<bool SingleInstruction> void Machine::execute_until(uint64_t deadline) 
         !impl_->mods.uses_oracle_cpu_service()&&impl_->headroom_pc_count.empty();
 #endif
     while(impl_->ticks<deadline) {
+        if(impl_->applying_plan)throw std::runtime_error("execution during mod activation");
+        for(const auto& [id,hook]:impl_->runtime_hooks)
+            if(hook.enabled&&hook.pc==impl_->gb.pc)hook.callback(*this,hook.user);
         auto& core=impl_->gb;
         if(core.llr_cpu_extra_budget&&impl_->mods.ends_cpu_work(core.pc))core.llr_cpu_extra_budget=0;
         auto extra_budget=core.llr_cpu_extra_budget;
@@ -567,6 +604,12 @@ template<bool SingleInstruction> void Machine::execute_until(uint64_t deadline) 
             }
         }
         unsigned cycles=GB_run(&impl_->gb);
+        if(impl_->gb.llr_native_uncovered) {
+            char message[160];std::snprintf(message,sizeof message,
+                "Native execution coverage gap: PC=%04x opcode=%02x physical=%08x; no interpreter executed",
+                impl_->gb.llr_uncovered_pc,impl_->gb.llr_uncovered_opcode,impl_->gb.llr_fetch_offset);
+            throw std::runtime_error(message);
+        }
         // GB_run executes one instruction for instruction-service profiles.
         // A new VBlank owns its replacement budget, including a zero budget
         // when the scene ended; never restore the previous frame over it.
@@ -598,6 +641,55 @@ void Machine::debug_step_instruction() {
     struct Restore {bool& value;bool previous;~Restore(){value=previous;}} restore{enabled,enabled};
     enabled=false;
     execute_until<true>(impl_->ticks+1);
+}
+void Machine::import_overlay(std::string id,std::span<const uint8_t> content) {
+    if(id.empty()||id.size()>96||id.find_first_not_of("abcdefghijklmnopqrstuvwxyz0123456789.-_")!=std::string::npos||
+       id=="ram"||id=="cartridge"||content.size()>64*1024*1024||impl_->applying_plan)
+        throw std::runtime_error("invalid overlay import");
+    std::string binding=id+":"+sha256(content);
+    impl_->overlays[std::move(id)]={content.begin(),content.end()};
+    impl_->extend_plan({reinterpret_cast<const uint8_t*>(binding.data()),binding.size()});
+}
+std::span<const uint8_t> Machine::overlay(std::string_view id)const {
+    auto i=impl_->overlays.find(id);return i==impl_->overlays.end()?std::span<const uint8_t>{}:std::span<const uint8_t>(i->second);
+}
+void Machine::register_runtime_hook(std::string id,uint16_t pc,RuntimeHook callback,void* user) {
+    if(!callback||id.empty()||impl_->applying_plan||impl_->runtime_hooks.contains(id))throw std::runtime_error("invalid runtime hook registration");
+    impl_->runtime_hooks.emplace(std::move(id),Impl::Hook{pc,callback,user});
+}
+bool Machine::apply_mod_plan(rmod_context* context,std::string_view game,
+    std::span<const rmod_patch> patches,std::span<const rmod_hook> hooks,std::string& error) {
+    struct Activation {
+        Machine& owner;Impl& m;std::map<std::string,Impl::Hook,std::less<>> before;
+        static int begin(void* p){auto& a=*static_cast<Activation*>(p);if(a.m.applying_plan||a.m.cooperative_active)return 0;a.m.applying_plan=true;return 1;}
+        static int read(void* p,const char* s,uint64_t address,uint8_t* out,size_t n) {
+            try{auto& a=*static_cast<Activation*>(p);auto& m=a.m;std::string_view space(s);
+                if(space=="ram"){if(!ram_extent(address,n))return 0;auto data=a.owner.debug_read(uint16_t(address),n);std::copy(data.begin(),data.end(),out);return 1;}
+                auto data=space=="cartridge"?std::span<const uint8_t>(m.gb.rom,m.gb.rom_size):a.owner.overlay(space);
+                if(address>data.size()||n>data.size()-address)return 0;std::copy_n(data.data()+address,n,out);return 1;
+            }catch(...){return 0;}
+        }
+        static int write(void* p,const char* s,uint64_t address,const uint8_t* data,size_t n) {
+            try{auto& a=*static_cast<Activation*>(p);auto& m=a.m;std::string_view space(s);
+                if(space=="ram"){if(!ram_extent(address,n))return 0;a.owner.debug_write(uint16_t(address),{data,n});return 1;}
+                std::span<uint8_t> target;
+                if(space=="cartridge")target={m.gb.rom,m.gb.rom_size};
+                else {auto i=m.overlays.find(space);if(i==m.overlays.end())return 0;target=i->second;}
+                if(address>target.size()||n>target.size()-address)return 0;std::copy_n(data,n,target.data()+address);return 1;
+            }catch(...){return 0;}
+        }
+        static int hook(void* p,const char* id){auto& a=*static_cast<Activation*>(p);auto i=a.m.runtime_hooks.find(id);if(i==a.m.runtime_hooks.end())return 0;i->second.enabled=true;return 1;}
+        static bool ram_extent(uint64_t a,size_t n){return (a>=0x8000&&a<=0xfea0&&n<=0xfea0-a)||(a>=0xff80&&a<=0xffff&&n<=0xffff-a);}
+        static void finish(void* p,int committed){auto& a=*static_cast<Activation*>(p);if(!committed)a.m.runtime_hooks.swap(a.before);a.m.applying_plan=false;}
+    } activation{*this,*impl_,impl_->runtime_hooks};
+    std::string game_id(game);rmod_engine engine{&activation,game_id.c_str(),impl_->identity.c_str(),
+        Activation::begin,Activation::read,Activation::write,Activation::hook,Activation::finish};
+    std::array<uint8_t,32> identity{};
+    auto before=snapshot();
+    auto result=rmod_apply(context,patches.data(),patches.size(),hooks.data(),hooks.size(),&engine,identity.data());
+    if(result<0)throw std::runtime_error("mod rollback failed; execution stopped");
+    if(result!=1){error=rmod_error(context);std::string restored;if(!restore(before,restored))throw std::runtime_error("mod rollback state restore failed: "+restored);return false;}
+    impl_->extend_plan(identity);error.clear();return true;
 }
 void Machine::execution_hook(void* context,bool (*pause)(void*,uint64_t,unsigned) noexcept) {
     impl_->execution_context=context;impl_->execution_pause=pause;
@@ -695,6 +787,7 @@ bool Machine::restore_state(std::span<const uint8_t> data,std::string& error,boo
         if(impl_->cooperative_active)throw std::runtime_error("cannot independently restore an active cable continuation");
         // Parse into a separately owned machine; any failure preserves live state.
         auto staged=std::make_unique<Impl>(impl_->rom,impl_->options);
+        staged->inherit_plan(*impl_);
         staged->load(data,false,sealed);
         staged->mods.restore_coop_menu(*this);
         staged->mods.preserve_host_presentation(impl_->mods);
@@ -862,6 +955,7 @@ std::string Machine::rom_identity() const {return impl_->identity;}
 std::vector<uint8_t> Machine::debug_read(uint16_t address,size_t length) const {
     if(length>65536u-address)throw std::runtime_error("debug read exceeds guest address space");
     auto copy=std::make_unique<Impl>(impl_->rom,impl_->options);
+    copy->inherit_plan(*impl_,false);
     copy->load(impl_->state(),true);
     // Debug observations inspect the physical bus without executing a native
     // CPU data service at a coincidentally paused instruction/stack boundary.
@@ -901,14 +995,8 @@ std::vector<uint8_t> read_file(const std::filesystem::path& p) {
     if(!f)throw std::runtime_error("file read failed");return data;
 }
 void write_file_atomic(const std::filesystem::path& p,std::span<const uint8_t> data) {
-    auto temp=p;temp+=".tmp";
-    {std::ofstream f(temp,std::ios::binary|std::ios::trunc);f.write(reinterpret_cast<const char*>(data.data()),data.size());f.flush();
-     if(!f)throw std::runtime_error("file write failed");}
-#ifdef _WIN32
-    if(!MoveFileExW(temp.c_str(),p.c_str(),MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH))
-        throw std::runtime_error("atomic file replacement failed");
-#else
-    std::filesystem::rename(temp,p);
-#endif
+    auto utf8=p.u8string();
+    if(!recomp_atomic_file_store(reinterpret_cast<const char*>(utf8.c_str()),data.data(),data.size()))
+        throw std::runtime_error("atomic file write failed");
 }
 }

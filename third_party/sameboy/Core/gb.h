@@ -673,6 +673,9 @@ struct GB_gameboy_internal_s {
         bool llr_native_wait_allowed;
         bool llr_native_poll_allowed;
         bool llr_native_enabled;
+        bool llr_native_uncovered;
+        uint16_t llr_uncovered_pc;
+        uint8_t llr_uncovered_opcode;
         bool llr_blocks_enabled;
         uint32_t llr_program_index; /* Immutable ROM catalogue choice; never guest state. */
         uint32_t llr_cycle_budget;
