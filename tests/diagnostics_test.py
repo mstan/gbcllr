@@ -7,10 +7,14 @@ import zipfile
 
 with tempfile.TemporaryDirectory(prefix="gbcllr-diagnostics-contract-") as scratch:
     desktop = sys.argv[1] == "--desktop"
+    native = sys.argv[1] == "--native"
     if desktop:
         profile = pathlib.Path(scratch, "profile")
         subprocess.run([sys.argv[2], "--support-shortcuts", str(profile)], check=True)
         folder = profile / "diagnostics"
+    elif native:
+        subprocess.run([sys.argv[2], scratch, "--native"], check=True)
+        folder = pathlib.Path(scratch, "recording")
     else:
         subprocess.run([sys.argv[1], scratch], check=True)
         folder = pathlib.Path(scratch, "recording")

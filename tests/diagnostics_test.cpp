@@ -6,10 +6,11 @@
 using namespace gbcllr;
 static void check(bool ok,const char* text){if(!ok)throw std::runtime_error(text);}
 int main(int argc,char** argv){try{
-    check(argc==2,"temporary output directory required");auto root=std::filesystem::path(argv[1]);
+    const bool native=argc==3&&std::string(argv[2])=="--native";
+    check(argc==2||native,"temporary output directory [--native] required");auto root=std::filesystem::path(argv[1]);
     std::vector<uint8_t> rom(32768);rom[0x100]=0xc3;rom[0x101]=0x50;rom[0x102]=1;
     const uint8_t loop[]={0xf3,0xaf,0xe0,0x40,0x21,0x00,0xc0,0x34,0x18,0xfd};std::copy(std::begin(loop),std::end(loop),rom.begin()+0x150);
-    Options options;options.native=false;Machine live(rom,options),replay(rom,options);
+    Options options;options.native=native;Machine live(rom,options),replay(rom,options);
     auto initial=live.snapshot();Diagnostics::Limits limits;limits.segment_frames=3;limits.history_segments=3;limits.history_bytes=initial.size()*4+16384;
     Diagnostics recording(root/"recording",live.diagnostic_metadata());check(recording.recording(),"diagnostics not enabled by default");
     live.frame_observer(recording.observer());
@@ -34,5 +35,6 @@ int main(int argc,char** argv){try{
         std::ofstream(root/"not-a-directory")<<"fixture";Diagnostics failed(root/"not-a-directory","storage failure");check(!failed.recording()&&failed.status().find("stopped")!=std::string::npos,"storage failure not reported");
         auto start=live.snapshot();check(replay.restore(start,error),error.c_str());live.frame_observer(failed.observer());live.run_frame(4);replay.run_frame(4);live.frame_observer({});check(live.digest()==replay.digest(),"failed diagnostics changed simulation");
     }
-    std::cout<<"diagnostics replay, discontinuity, queue/storage bounds and report passed\n";return 0;
+    if(native)check(live.stats().instructions_native>0&&live.stats().instructions_fallback==0,"native fixture did not stay on its generated CPU path");
+    std::cout<<"diagnostics replay, discontinuity, queue/storage bounds and report passed ("<<(native?"native":"portable CPU reference")<<")\n";return 0;
 }catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}}
