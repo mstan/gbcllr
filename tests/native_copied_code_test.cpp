@@ -7,6 +7,8 @@ using namespace gbcllr;
 static void check(bool value,const char* text){if(!value)throw std::runtime_error(text);}
 int main(){try{
     auto rom=native_contract_rom();Machine machine(rom,Options{});
+    // Observe DMA bytes without a coincident LCD OAM-read barrier.
+    const std::array<uint8_t,1> lcd_off{0};machine.debug_write(0xff40,lcd_off);
     std::array<uint8_t,160> objects{};for(unsigned i=0;i<objects.size();++i)objects[i]=uint8_t(i^0x5a);
     machine.debug_write(0xc100,objects);
     // The original routine is copied into writable HRAM at a different base.
