@@ -12,7 +12,7 @@
 
 const char *GB_display_state_profile(const GB_gameboy_t *gb)
 {
-    return gb->llr_frame_picture_enabled ? "-frame-picture-v1" : GB_display_reference_state_profile(gb);
+    return gb->llr_frame_picture_enabled ? "-frame-picture-v2" : GB_display_reference_state_profile(gb);
 }
 
 enum { PICTURE_OFF=GB_FRAME_PICTURE_OFF, FIRST_OAM, FIRST_MODE3, FIRST_PALETTE, FIRST_DRAW,
@@ -76,7 +76,18 @@ static noinline bool picture_prefix_copy(GB_gameboy_t *gb, unsigned end)
     render.screen = scratch;
     render.border_mode = GB_BORDER_NEVER;
     render.n_visible_objs = render.orig_n_visible_objs;
-    render_line(&render LLR_NO_OBSERVE_ARG);
+#if GBCLLR_OBSERVED_DISPLAY
+    /* Private row evaluation must publish only the committed span. Earlier
+     * palette/window inputs have already produced their own metadata. */
+    uint32_t observed[WIDTH];
+    bool observe = gb->llr_bg_emitted_row && gb->llr_bg_source_colors && gb->llr_bg_row_callback;
+    render.llr_bg_emitted_row = observed;
+    render_line(&render, observe);
+    if (observe) memcpy(gb->llr_bg_emitted_row + gb->lcd_x, observed + gb->lcd_x,
+                        (end - gb->lcd_x) * sizeof(uint32_t));
+#else
+    render_line(&render);
+#endif
     uint32_t *destination = gb->screen + gb->current_line * WIDTH;
     if (gb->border_mode == GB_BORDER_ALWAYS)
         destination = gb->screen + gb->current_line * BORDERED_WIDTH +
@@ -102,7 +113,11 @@ static void picture_prefix(GB_gameboy_t *gb, unsigned end)
         uint8_t fetcher = gb->fetcher_state;
         uint8_t tile0 = gb->current_tile_data[0], tile1 = gb->current_tile_data[1];
         gb->n_visible_objs = gb->orig_n_visible_objs;
-        render_line(gb LLR_NO_OBSERVE_ARG);
+#if GBCLLR_OBSERVED_DISPLAY
+        render_line(gb, gb->llr_bg_emitted_row && gb->llr_bg_source_colors && gb->llr_bg_row_callback);
+#else
+        render_line(gb);
+#endif
         window = gb->window_y != window_y;
         gb->n_visible_objs = objects;
         gb->data_for_sel_glitch = glitch;
@@ -159,6 +174,11 @@ void GB_display_run(GB_gameboy_t *gb, unsigned cycles, bool force)
     }
     if (gb->display_state < PICTURE_OFF || gb->display_state > LAST_END || gb->display_state==PICTURE_OFF) {
         gb->current_line = 0;
+#if GBCLLR_OBSERVED_DISPLAY
+        /* Startup bypasses the normal scanline callback. Publish its source
+         * before the first row without executing the old dot/FIFO clock. */
+        if (gb->llr_first_line_callback) gb->llr_first_line_callback(gb, 0);
+#endif
         gb->window_y = -1;
         gb->wy_triggered = false;
         gb->ly_for_comparison=0;gb->io_registers[GB_IO_STAT]&=~3;gb->mode_for_interrupt=-1;
@@ -175,6 +195,9 @@ void GB_display_run(GB_gameboy_t *gb, unsigned cycles, bool force)
                 gb->oam_write_blocked=true;gb->cycles_for_line+=2;GB_STAT_update(gb);
                 gb->display_state=FIRST_MODE3;gb->display_cycles-=2*2;break;
             case FIRST_MODE3:
+                /* Startup has no normal line-mode2 transition. The first
+                 * native transfer still observes WY=0 before its window. */
+                wy_check(gb);
                 gb->n_visible_objs=gb->orig_n_visible_objs=0;gb->cycles_for_line+=8;
                 gb->io_registers[GB_IO_STAT]=(gb->io_registers[GB_IO_STAT]&~3)|3;
                 gb->mode_for_interrupt=3;gb->oam_write_blocked=gb->oam_read_blocked=true;

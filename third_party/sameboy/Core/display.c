@@ -1314,6 +1314,9 @@ static LLR_DISPLAY_INLINE void render_line(GB_gameboy_t *gb LLR_OBSERVE_PARAM)
     if (unlikely(gb->background_disabled) || (!gb->cgb_mode && !(gb->io_registers[GB_IO_LCDC] & GB_LCDC_BG_EN))) {
         uint32_t bg = gb->background_palettes_rgb[gb->cgb_mode? 0 : (gb->io_registers[GB_IO_BGP] & 3)];
         for (unsigned i = 160; i--;) {
+#if GBCLLR_OBSERVED_DISPLAY
+            if (observe) gb->llr_bg_emitted_row[159 - i] = object_buffer_pointer->pixel ? 2 : 1;
+#endif
             if (unlikely(object_buffer_pointer->pixel)) {
                 uint8_t pixel = object_buffer_pointer->pixel;
                 if (!gb->cgb_mode) {
