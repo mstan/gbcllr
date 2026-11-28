@@ -32,6 +32,17 @@ def copied_dma_sources(rom):
     return [i for i in range(len(rom)-9)
             if rom[i] == 0x3e and rom[i+2:i+10] == bytes.fromhex('e0 46 3e 28 3d 20 fd c9')]
 
+def writable_jump_slots(rom):
+    """Find original LD-HL installers of a three-byte writable JP thunk."""
+    slots=set()
+    for i in range(len(rom)-10):
+        if (rom[i] == 0x21 and rom[i+3:i+7] == bytes.fromhex('3e c3 22 3e')
+                and rom[i+8:i+10] == bytes.fromhex('22 36')):
+            slot=int.from_bytes(rom[i+1:i+3],'little')
+            if 0xc000 <= slot <= 0xdffd:
+                slots.add(slot)
+    return sorted(slots)
+
 def discover(rom, seeds):
     """Follow only direct flow within a known bank; unresolved edges stay safe."""
     seen = set()
@@ -88,6 +99,12 @@ def generate(rom, seeds, output, blocks=False, prefix='llr', complete=False):
         out += ['};', f'static const uint8_t {prefix}_expected[{len(rom)}] = {{']
         out += [','.join(str(v) for v in rom[i:i+32])+',' for i in range(0,len(rom),32)]
         out += ['};', f'static unsigned {prefix}_native_dispatch(GB_gameboy_t *gb, uint32_t offset, uint8_t opcode) {{']
+        jump_slots=writable_jump_slots(rom)
+        if jump_slots:
+            # The original installer owns this one JP instruction in RAM.
+            # Its target is writable state and remains a pair of live reads.
+            slots=' || '.join(f'(uint16_t)(gb->pc - 1) == 0x{slot:04x}' for slot in jump_slots)
+            out += [f'if (offset == UINT32_MAX && opcode == 0xc3 && ({slots})) {{ {prefix}_op_c3(gb); return 1; }}']
         # Crystal copies this original ROM routine into HRAM at startup.
         # Bind the copied native entries to their exact original source bytes.
         # Operands remain live timed reads, and writes to either space are valid.
@@ -142,6 +159,7 @@ def generate(rom, seeds, output, blocks=False, prefix='llr', complete=False):
                 'banks':len(banks), 'blocks':block_count}
     if complete:
         metadata['copied_oam_dma_sources']=copied_dma_sources(rom)
+        metadata['writable_jump_slots']=writable_jump_slots(rom)
     (output/'program.json').write_text(json.dumps(metadata, indent=2)+'\n')
     return metadata
 

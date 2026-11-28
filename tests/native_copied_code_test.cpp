@@ -23,7 +23,17 @@ int main(){try{
     check(machine.stats().instructions_native>0&&machine.stats().instructions_fallback==0,"copied routine left native execution");
     check(machine.restore(start,error),error.c_str());machine.run_frame();machine.take_audio();
     check(machine.snapshot()==result,"copied native routine current-load replay differs");
+    Machine thunk(rom,Options{});thunk.debug_write(0xff40,lcd_off);thunk.debug_write(0xfff0,target);
+    registers=thunk.debug_registers();registers.pc=0x230;registers.sp=0xfff0;registers.ime=0;
+    thunk.debug_registers(registers);thunk.run_frame();thunk.take_audio();
+    check(thunk.debug_read(0xc4b7,3)==std::vector<uint8_t>({0xc3,0xc0,0x01}),"original native thunk installer failed");
+    const std::array<uint8_t,1> changed_target{0xd0};thunk.debug_write(0xc4b8,changed_target);
+    native_contract_entry(thunk,0xc4b7);auto thunk_start=thunk.snapshot();
+    thunk.run_frame();thunk.take_audio();auto thunk_result=thunk.snapshot();
+    check(thunk.stats().pc==0x1d0&&thunk.stats().instructions_fallback==0,"native writable jump lost its live target");
+    check(thunk.restore(thunk_start,error),error.c_str());thunk.run_frame();thunk.take_audio();
+    check(thunk.snapshot()==thunk_result,"writable native thunk current-load replay differs");
     check(native_contract_rom()==rom,"native copied execution modified its original input");
-    std::cout<<"Source-bound copied HRAM DMA, live operands and current-load replay pass\n";
+    std::cout<<"Source-bound copied HRAM DMA and writable JP thunks, live operands and current-load replay pass\n";
     return 0;
 }catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}}
