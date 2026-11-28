@@ -1,8 +1,8 @@
-"""Emit conservative, opcode-specialized native ROM entries against timed LLE.
+"""Emit source-bound, opcode-specialized native entries with timed bus reads.
 
 Ordinary entries retain instruction boundaries and bus reads (including
 immediates). Qualified native wait operations retain all observable device,
-IRQ and host boundaries. Unknown/RAM entries safely use the donor CPU.
+IRQ and host boundaries. HLE builds report uncovered entries without fallback.
 Generated output is ROM-derived.
 """
 import argparse
@@ -26,6 +26,11 @@ LENGTHS = [
     2,1,1,1,1,1,2,1,2,1,3,1,1,1,2,1,
 ]
 ILLEGAL = {0xd3,0xdb,0xdd,0xe3,0xe4,0xeb,0xec,0xed,0xf4,0xfc,0xfd}
+
+def copied_dma_sources(rom):
+    """Recognize original OAM-DMA routines which games copy into live HRAM."""
+    return [i for i in range(len(rom)-9)
+            if rom[i] == 0x3e and rom[i+2:i+10] == bytes.fromhex('e0 46 3e 28 3d 20 fd c9')]
 
 def discover(rom, seeds):
     """Follow only direct flow within a known bank; unresolved edges stay safe."""
@@ -99,6 +104,20 @@ def generate(rom, seeds, output, blocks=False, prefix='llr', complete=False):
                 out += [f'case 0x{destination+pos-start:04x}: if (opcode != 0x{rom[pos]:02x}) return 0; {prefix}_op_{rom[pos]:02x}(gb); return 1;']
                 pos+=LENGTHS[rom[pos]]
             out += ['default: return 0;', '}', '}']
+        dma_sources=copied_dma_sources(rom)
+        if dma_sources:
+            # Source-bound native entries retain live operand reads. Matching
+            # instruction boundaries protects against entering unrelated HRAM;
+            # an updated DMA page/count remains valid writable game state.
+            positions=(0,2,4,6,7,9)
+            source=dma_sources[0]
+            out += ['if (offset == UINT32_MAX) {', 'unsigned pc = (uint16_t)(gb->pc - 1);']
+            for relative in positions:
+                guards=' && '.join(f'gb->hram[base - 0xff80 + {p}] == 0x{rom[source+p]:02x}' for p in positions)
+                out += [f'if (opcode == 0x{rom[source+relative]:02x} && pc >= 0xff80 + {relative}) {{',
+                        f'unsigned base = pc - {relative};',
+                        f'if (base + 10 <= 0xffff && {guards}) {{ {prefix}_op_{rom[source+relative]:02x}(gb); return 1; }}', '}']
+            out += ['return 0;', '}']
         out += [f'if (offset >= {len(rom)} || {prefix}_expected[offset] != opcode) return 0;']
     else:
         out += ['};', f'static const uint16_t {prefix}_map[{len(rom)}] = {{']
@@ -121,6 +140,8 @@ def generate(rom, seeds, output, blocks=False, prefix='llr', complete=False):
     metadata = {'sha256':digest, 'rom_bytes':len(rom), 'native_entries':len(rom) if complete else len(entries),
                 'tier':'complete-original-entry-specialization' if complete else 'resumable-native-blocks' if blocks else 'instruction-specialization',
                 'banks':len(banks), 'blocks':block_count}
+    if complete:
+        metadata['copied_oam_dma_sources']=copied_dma_sources(rom)
     (output/'program.json').write_text(json.dumps(metadata, indent=2)+'\n')
     return metadata
 
