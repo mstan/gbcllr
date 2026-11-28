@@ -1,6 +1,7 @@
 #include "../src/native_sgb_service.hpp"
 #include <gbcllr/machine.hpp>
 #include <gbcllr/presentation.hpp>
+#include "native_contract_rom.hpp"
 #include <algorithm>
 #include <iostream>
 #include <stdexcept>
@@ -67,9 +68,10 @@ int main(){try{
  s.complete_frame(native);border_loaded.complete_frame(native);check(s.view().border[0]==0xffc68442&&s.snapshot()==border_loaded.snapshot(),"completed border replay or bit expansion differs");
  NativeSgbService mid(true);std::fill(vram.begin(),vram.end(),0);word(0x800,0x4104);word(0x802,0x2218);send(mid,0x0b,{},vram);send(mid,0x0a,{0,0,0,0,0,0,0,0},vram);mid.complete_frame(native);
  check(mid.view().colors[0]==0xff214284&&mid.view().colors[1]==0xffc68442,"game/border RGB555 expansion disagrees");
- std::vector<uint8_t> rom(32768);rom[0x146]=3;rom[0x100]=0xc3;rom[0x101]=0x50;rom[0x102]=1;rom[0x150]=0x18;rom[0x151]=0xfe;Options off;off.native=false;Machine baseline(rom,off);auto base=baseline.snapshot();check(!baseline.sgb_view().active&&baseline.sgb_view().supported,"default native profile enabled SGB detection");
+ auto rom=native_contract_rom();Options off;Machine baseline(rom,off);native_contract_entry(baseline,0x1c0);auto base=baseline.snapshot();check(!baseline.sgb_view().active&&baseline.sgb_view().supported,"default native profile enabled SGB detection");
  Options on=off;on.sgb_service=true;Machine active(rom,on);std::string error;auto current=active.snapshot();check(!active.restore(base,error)&&active.snapshot()==current,"cross-profile SGB load accepted or mutated owner");
  active.run_frame();active.take_audio();current=active.snapshot();check(active.restore(current,error)&&active.snapshot()==current,"current SGB machine snapshot changed");
+ check(active.stats().instructions_native>0&&active.stats().instructions_fallback==0,"SGB fixture left native execution");
  auto corrupt=current;corrupt[corrupt.size()-65]=255;auto hash=sha256(std::span(corrupt).first(corrupt.size()-64));std::copy(hash.begin(),hash.end(),corrupt.end()-64);check(!active.restore(corrupt,error)&&active.snapshot()==current,"invalid SGB state was not atomically rejected");
  check(uint32_t(base[0])==Machine::snapshot_schema,"snapshot schema did not use public constant");
  std::cout<<"PASS native SGB packet vectors,exact shades/regions,authored border,freeze metadata/current replay,read-only view,default/profile guards,atomic invalid-state rejection\n";return 0;

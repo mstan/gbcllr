@@ -313,21 +313,12 @@ struct Machine::Impl {
         gb.last_rtc_second=options.rtc_epoch;
         gb.llr_native_enabled=options.native;
 #if GBCLLR_FRAME_PICTURE
-        // Only these CGB cartridges have qualified this replacement. Unknown
-        // games and hardware/PPU test ROMs retain the actual reference clock.
-        gb.llr_frame_picture_enabled=options.model==Model::cgb && !sgb &&
-            !options.reference_picture && !mods.has_coop() &&
-            (identity=="fdcc3c8c43813cf8731fc037d2a6d191bac75439c34b24ba1c27526e6acdc8a2" ||
-             identity=="e37a14a8e61bd64f2226dacc26a7ee75dd90abfcf88c5016eb97b76ecda0ddca");
+        // The native frame owner serves the supported hardware and observer
+        // contracts. Cartridge identity is checked by the program owner above,
+        // rather than selecting a reference picture clock for another title.
+        gb.llr_frame_picture_enabled=!options.reference_picture && options.model==Model::cgb;
 #if GBCLLR_DMG_FRAME
-        // The existing native line-picture owner also serves the exact Gen1
-        // cartridge. Its native map compositor retains its instruction, write,
-        // line and frame observers; SGB remains a separately qualified profile.
-        if(options.model==Model::dmg && !sgb && !options.reference_picture && !mods.active() &&
-           identity=="42045a1642f77b568534ab85b9db93c8a33d2b95c38ae84c987f497e8d52f97f")
-            gb.llr_frame_picture_enabled=true;
-        if(options.model==Model::dmg && !sgb && !options.reference_picture &&
-           identity=="5ca7ba01642a3b27b0cc0b5349b52792795b62d3ed977e98a09390659af96b7b")
+        if(!options.reference_picture && options.model==Model::dmg)
             gb.llr_frame_picture_enabled=true;
 #endif
 #endif

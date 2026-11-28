@@ -1,6 +1,7 @@
 #include "../src/xtreme2_controls.hpp"
 #include "../src/native_mods.hpp"
 #include <gbcllr/machine.hpp>
+#include "native_contract_rom.hpp"
 #include <iostream>
 #include <stdexcept>
 using namespace gbcllr;
@@ -8,15 +9,14 @@ static void check(bool pass,const char* text){if(!pass)throw std::runtime_error(
 int main(){try{
  // A cartridge sees exactly its original eight buttons even when either
  // logical seat also holds virtual actions. Ordinary snapshots stay equal.
- std::vector<uint8_t> rom(32768);rom[0x100]=0xc3;rom[0x101]=0x50;rom[0x102]=1;
- const uint8_t code[]={0x3e,0x10,0xe0,0,0xf0,0,0xea,0,0xc0,0x18,0xf5};
- std::copy(std::begin(code),std::end(code),rom.begin()+0x150);
- Options options;options.native=false;
+ auto rom=native_contract_rom();Options options;
  Machine a(rom,options),b(rom,options);
+ native_contract_entry(a,0x180);native_contract_entry(b,0x180);
  for(unsigned i=0;i<3;++i){a.run_frame(16);b.run_frame(LogicalInput{16,3},LogicalInput{255,3});}
  check(a.snapshot()==b.snapshot(),"Virtual inputs entered cartridge hardware/state");
  bool rejected=false;try{b.run_frame(LogicalInput{0,4});}catch(const std::exception&){rejected=true;}
  check(rejected,"Unknown virtual button accepted");
+ check(a.stats().instructions_native>0&&a.stats().instructions_fallback==0&&b.stats().instructions_fallback==0,"input fixture left native execution");
  std::array<uint8_t,0x8000> ram{};ram[0x101]=2;ram[0x121]=16;ram[0x9b0]=1;
  ram[0x6f]=0x40; // Acquired weapon2 with zero energy; selection remains valid.
  ModContext c{};c.wram=ram.data();c.rom_bank=5;

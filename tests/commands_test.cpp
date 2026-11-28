@@ -1,4 +1,5 @@
 #include <gbcllr/machine.hpp>
+#include "native_contract_rom.hpp"
 #include <algorithm>
 #include <chrono>
 #include <fstream>
@@ -17,11 +18,7 @@ int main(){try{
         ~Cleanup(){std::error_code e;for(auto name:{"case.commands","base.state","forbidden.sav","capture.wav"})
             std::filesystem::remove(root/name,e);std::filesystem::remove(root,e);}
     } cleanup{root};
-    std::vector<uint8_t> rom(32768);
-    rom[0x100]=0xc3;rom[0x101]=0x50;rom[0x102]=1;rom[0x147]=3;rom[0x149]=2;
-    const uint8_t loop[]={0xfa,0x00,0xc0,0x3c,0xea,0x00,0xc0,0x18,0xf7};
-    std::copy(std::begin(loop),std::end(loop),rom.begin()+0x150);
-    Options options;options.native=false;
+    auto rom=native_contract_rom();Options options;
     Machine machine(rom,options),expected(rom,options);const auto base=machine.snapshot();std::string error;
     auto reset=[&]{check(machine.restore(base,error),"reset failed");check(expected.restore(base,error),"oracle reset failed");};
     auto advance=[&](unsigned frames,uint8_t buttons){for(unsigned i=0;i<frames;++i){expected.run_frame(buttons);expected.take_audio();}};
@@ -66,6 +63,7 @@ int main(){try{
     check(machine.stats().pc==0x157&&machine.debug_read(0xc000,1)[0]==1,
           "QA PC wait did not stop after the original memory store");
     reset();advance(2,0);expected.set_buttons(32);rejected("history 4\nframes 2 0\nbuttons 32\nrewind 1\n");
+    check(machine.stats().instructions_native>0&&machine.stats().instructions_fallback==0,"commands fixture left native execution");
     std::cout<<"QA rbengine rewind replay, branching, eviction, invalid targets, mutation resets and save guard passed\n";
     return 0;
 }catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}}
